@@ -1,22 +1,113 @@
 import kotlin.random.Random
 import kotlin.system.exitProcess
+import java.util.concurrent.ThreadLocalRandom
+import java.io.FileInputStream
+import java.io.IOException
+
+// Загрузка данных из файла (CSV формат)
+fun loadDataFromFile(filePath: String): Pair<Map<String, Map<String, Int>>, Map<String, AnimalCharacteristics>> {
+    val eatProbabilities = mutableMapOf<String, MutableMap<String, Int>>()
+    val animalCharacteristics = mutableMapOf<String, AnimalCharacteristics>()
+
+    try {
+        val file = FileInputStream(filePath).bufferedReader()
+        file.readLine() // Пропускаем строку заголовков
+
+        var line: String? = file.readLine()
+        while (line != null) {
+            if (line.trim().isEmpty()) {
+                line = file.readLine()
+                continue // Пропускаем пустые строки
+            }
+
+            val parts = line.split(",")
+            val animalName = parts.getOrNull(0)?.trim() ?: ""
+
+            //Если AnimalCharacteristic
+            if(animalName in listOf("Волк", "Удав", "Лиса", "Медведь", "Орел", "Лошадь", "Олень", "Кролик", "Мышь", "Коза", "Овца", "Кабан", "Буйвол", "Утка", "Гусеница")) {
+                val eatProbabilityMap = mutableMapOf<String, Int>()
+                eatProbabilityMap["Волк"] = parts.getOrNull(1)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Удав"] = parts.getOrNull(2)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Лиса"] = parts.getOrNull(3)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Медведь"] = parts.getOrNull(4)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Орел"] = parts.getOrNull(5)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Лошадь"] = parts.getOrNull(6)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Олень"] = parts.getOrNull(7)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Кролик"] = parts.getOrNull(8)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Мышь"] = parts.getOrNull(9)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Коза"] = parts.getOrNull(10)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Овца"] = parts.getOrNull(11)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Кабан"] = parts.getOrNull(12)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Буйвол"] = parts.getOrNull(13)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Утка"] = parts.getOrNull(14)?.replace("\"", "")?.toIntOrNull() ?: 0
+                eatProbabilityMap["Гусеница"] = parts.getOrNull(15)?.replace("\"", "")?.toIntOrNull() ?: 0
+
+                eatProbabilities[animalName] = eatProbabilityMap
+
+            } else {
+                println("Неизвестный тип записи: $animalName")
+            }
+            line = file.readLine()
+        }
+
+        file.close()
+
+    } catch (e: IOException) {
+        println("Ошибка при чтении файла: ${e.message}")
+    }
+
+    //Animal characteristic
+    val animalChar = AnimalCharacteristics(50.0,20,3.0,10.0)
+    animalCharacteristics["Волк"] = animalChar
+    animalCharacteristics["Удав"] = animalChar
+    animalCharacteristics["Лиса"] = animalChar
+    animalCharacteristics["Медведь"] = animalChar
+    animalCharacteristics["Орел"] = animalChar
+    animalCharacteristics["Лошадь"] = animalChar
+    animalCharacteristics["Олень"] = animalChar
+    animalCharacteristics["Кролик"] = animalChar
+    animalCharacteristics["Мышь"] = animalChar
+    animalCharacteristics["Коза"] = animalChar
+    animalCharacteristics["Овца"] = animalChar
+    animalCharacteristics["Кабан"] = animalChar
+    animalCharacteristics["Буйвол"] = animalChar
+    animalCharacteristics["Утка"] = animalChar
+    animalCharacteristics["Гусеница"] = animalChar
+
+    return Pair(eatProbabilities.toMap(), animalCharacteristics.toMap())
+}
+
+// Класс для хранения характеристик животного
+data class AnimalCharacteristics(
+    val weight: Double,
+    val maxCount: Int,
+    val speed: Double,
+    val foodNeeded: Double
+)
 
 // Класс для хранения параметров симуляции
 data class SimulationConfig(
     val islandWidth: Int,
     val islandHeight: Int,
-    val initialHerbivores: Int,
-    val initialPredators: Int,
+    val initialAnimals: Map<String, Int>,
     val plantGrowthProbability: Int,
     val simulationSpeed: Long,
-    val stopCondition: () -> Boolean
+    val stopCondition: () -> Boolean,
+    val animalDataFile: String
 )
 
 // Абстрактный класс Animal
-abstract class Animal(val name: String, var x: Int, var y: Int, val symbol: String) {
-    abstract fun move()
+abstract class Animal(
+    val name: String,
+    var x: Int,
+    var y: Int,
+    val symbol: String,
+    val characteristics: AnimalCharacteristics
+) {
+    abstract fun move(island: Island)
     abstract fun reproduce(): Animal?
     abstract fun die(): Boolean
+    abstract fun eat(location: Location, eatProbabilities: Map<String, Map<String, Int>>)
 
     // Метод для проверки, находится ли животное в пределах острова
     fun isWithinBounds(island: Array<Array<Location>>): Boolean {
@@ -24,53 +115,221 @@ abstract class Animal(val name: String, var x: Int, var y: Int, val symbol: Stri
     }
 }
 
-// Класс для травоядных животных
-class Herbivore(name: String, x: Int, y: Int, symbol: String) : Animal(name, x, y, symbol) {
-    override fun move() {
+// Иерархия хищников
+sealed class Predator(name: String, x: Int, y: Int, symbol: String, characteristics: AnimalCharacteristics) :
+    Animal(name, x, y, symbol, characteristics) {
+    class Wolf(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Predator("Волк", x, y, "🐺", characteristics)
+
+    class Boa(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Predator("Удав", x, y, "🐍", characteristics)
+
+    class Fox(x: Int, y: Int, symbol: String, characteristics: AnimalCharacteristics) :
+        Predator("Лиса", x, y, symbol, characteristics)
+
+    class Bear(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Predator("Медведь", x, y, "🐻", characteristics)
+
+    class Eagle(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Predator("Орел", x, y, "🦅", characteristics)
+
+    override fun move(island: Island) {
         // Случайное направление движения
         val directions = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
         val (dx, dy) = directions.random()
-        x += dx
-        y += dy
+        val speed = characteristics.speed.toInt()
+
+        for (i in 1..speed) { // Учитываем скорость передвижения
+            val newX = x + dx
+            val newY = y + dy
+
+            if (newX in island.grid.indices && newY in island.grid[0].indices) { // Проверяем границы острова
+                x = newX
+                y = newY
+            } else {
+                //Если животное вышло за границы, остаёмся на месте.
+                break
+            }
+        }
     }
 
     override fun reproduce(): Animal? {
-        // Вероятность размножения 50%
-        return if (Random.nextInt(100) < 50) {
-            Herbivore(name, x, y, symbol) // Создаем нового травоядного
+        // Вероятность размножения зависит от вида
+        val reproduceProbability = when (this) {
+            is Wolf -> 30
+            is Boa -> 20
+            is Fox -> 40
+            is Bear -> 10
+            is Eagle -> 25
+        }
+
+        return if (ThreadLocalRandom.current().nextInt(100) < reproduceProbability) {
+            when (this) {
+                is Wolf -> Wolf(x, y, this.characteristics)
+                is Boa -> Boa(x, y, this.characteristics)
+                is Fox -> Fox(x, y, this.symbol, this.characteristics)
+                is Bear -> Bear(x, y, this.characteristics)
+                is Eagle -> Eagle(x, y, this.characteristics)
+            }
         } else {
             null
         }
     }
 
     override fun die(): Boolean {
-        // Вероятность смерти 10%
-        return Random.nextInt(100) < 10
+        // Вероятность смерти зависит от вида
+        val dieProbability = when (this) {
+            is Wolf -> 15
+            is Boa -> 10
+            is Fox -> 20
+            is Bear -> 5
+            is Eagle -> 12
+        }
+        return ThreadLocalRandom.current().nextInt(100) < dieProbability
+    }
+
+    override fun eat(location: Location, eatProbabilities: Map<String, Map<String, Int>>) {
+        val prey = location.animals.filter { it !== this }.toMutableList() // Список потенциальной добычи
+        if (prey.isNotEmpty()) {
+            val eatProbabilityMap = eatProbabilities[this.name] ?: return // Вероятности поедания для этого хищника
+            val animalsToRemove = mutableListOf<Animal>()
+            for (victim in prey) {
+                val eatProbability = eatProbabilityMap[victim.name] ?: 0 // Вероятность съесть конкретную жертву
+                if (ThreadLocalRandom.current().nextInt(100) < eatProbability) {
+                    animalsToRemove.add(victim)
+                    // println("${this.name} съел ${victim.name}")
+                    break // Съедаем только одну жертву за раз
+                }
+            }
+            location.animals.removeAll(animalsToRemove)
+        }
     }
 }
 
-// Класс для хищников
-class Predator(name: String, x: Int, y: Int, symbol: String) : Animal(name, x, y, symbol) {
-    override fun move() {
+// Иерархия травоядных
+sealed class Herbivore(name: String, x: Int, y: Int, symbol: String, characteristics: AnimalCharacteristics) :
+    Animal(name, x, y, symbol, characteristics) {
+    class Horse(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Лошадь", x, y, "🐎", characteristics)
+
+    class Deer(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Олень", x, y, "🦌", characteristics)
+
+    class Rabbit(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Кролик", x, y, "🐇", characteristics)
+
+    class Mouse(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Мышь", x, y, "🐁", characteristics)
+
+    class Goat(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Коза", x, y, "🐐", characteristics)
+
+    class Sheep(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Овца", x, y, "🐑", characteristics)
+
+    class Boar(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Кабан", x, y, "🐗", characteristics)
+
+    class Buffalo(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Буйвол", x, y, "🐃", characteristics)
+
+    class Duck(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Утка", x, y, "🦆", characteristics)
+
+    class Caterpillar(x: Int, y: Int, characteristics: AnimalCharacteristics) :
+        Herbivore("Гусеница", x, y, "🐛", characteristics)
+
+    override fun move(island: Island) {
         // Случайное направление движения
         val directions = listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)
         val (dx, dy) = directions.random()
-        x += dx
-        y += dy
+        val speed = characteristics.speed.toInt()
+
+        for (i in 1..speed) { // Учитываем скорость передвижения
+            val newX = x + dx
+            val newY = y + dy
+
+            if (newX in island.grid.indices && newY in island.grid[0].indices) { // Проверяем границы острова
+                x = newX
+                y = newY
+            } else {
+                //Если животное вышло за границы, остаёмся на месте.
+                break
+            }
+        }
     }
 
     override fun reproduce(): Animal? {
-        // Вероятность размножения 30%
-        return if (Random.nextInt(100) < 30) {
-            Predator(name, x, y, symbol) // Создаем нового хищника
+        // Вероятность размножения зависит от вида
+        val reproduceProbability = when (this) {
+            is Horse -> 20
+            is Deer -> 25
+            is Rabbit -> 60
+            is Mouse -> 70
+            is Goat -> 30
+            is Sheep -> 25
+            is Boar -> 40
+            is Buffalo -> 15
+            is Duck -> 50
+            is Caterpillar -> 80
+        }
+        return if (ThreadLocalRandom.current().nextInt(100) < reproduceProbability) {
+            when (this) {
+                is Horse -> Horse(x, y, this.characteristics)
+                is Deer -> Deer(x, y, this.characteristics)
+                is Rabbit -> Rabbit(x, y, this.characteristics)
+                is Mouse -> Mouse(x, y, this.characteristics)
+                is Goat -> Goat(x, y, this.characteristics)
+                is Sheep -> Sheep(x, y, this.characteristics)
+                is Boar -> Boar(x, y, this.characteristics)
+                is Buffalo -> Buffalo(x, y, this.characteristics)
+                is Duck -> Duck(x, y, this.characteristics)
+                is Caterpillar -> Caterpillar(x, y, this.characteristics)
+            }
         } else {
             null
         }
     }
 
     override fun die(): Boolean {
-        // Вероятность смерти 20%
-        return Random.nextInt(100) < 20
+        // Вероятность смерти зависит от вида
+        val dieProbability = when (this) {
+            is Horse -> 5
+            is Deer -> 7
+            is Rabbit -> 10
+            is Mouse -> 15
+            is Goat -> 8
+            is Sheep -> 7
+            is Boar -> 10
+            is Buffalo -> 3
+            is Duck -> 12
+            is Caterpillar -> 20
+        }
+        return ThreadLocalRandom.current().nextInt(100) < dieProbability
+    }
+
+    override fun eat(location: Location, eatProbabilities: Map<String, Map<String, Int>>) {
+        if (this is Duck) {
+            // Утка ест гусениц
+            if (location.animals.any { it is Caterpillar }) {
+                val eatProbabilityMap = eatProbabilities[this.name] ?: return
+                val caterpillar = location.animals.find { it is Caterpillar }
+                if (caterpillar != null) {
+                    val eatProbability = eatProbabilityMap[caterpillar.name] ?: 0
+                    if (ThreadLocalRandom.current().nextInt(100) < eatProbability) {
+                        location.animals.remove(caterpillar)
+                    }
+                }
+            } else { // Другие травоядные едят растения
+                if (location.plants.isNotEmpty()) {
+                    location.plants.removeAt(0) // Едим первое растение
+                }
+            }
+        } else { // Другие травоядные едят растения
+            if (location.plants.isNotEmpty()) {
+                location.plants.removeAt(0) // Едим первое растение
+            }
+        }
     }
 }
 
@@ -88,36 +347,57 @@ class Island(val width: Int, val height: Int) {
     val grid = Array(width) { Array(height) { Location() } }
 
     // Инициализация острова
-    fun initialize(config: SimulationConfig) {
-        // Добавляем травоядных
-        repeat(config.initialHerbivores) {
-            addAnimal(Herbivore("Олень", Random.nextInt(width), Random.nextInt(height), "🦌"))
-        }
-
-        // Добавляем хищников
-        repeat(config.initialPredators) {
-            addAnimal(Predator("Волк", Random.nextInt(width), Random.nextInt(height), "🐺"))
+    fun initialize(config: SimulationConfig, animalCharacteristics: Map<String, AnimalCharacteristics>) {
+        // Добавляем животных
+        config.initialAnimals.forEach { (animalName, count) ->
+            repeat(count) {
+                val x = ThreadLocalRandom.current().nextInt(width)
+                val y = ThreadLocalRandom.current().nextInt(height)
+                val characteristics = animalCharacteristics[animalName] ?: error("Нет характеристик для животного $animalName")
+                val animal = when (animalName) {
+                    "Волк" -> Predator.Wolf(x, y, characteristics)
+                    "Удав" -> Predator.Boa(x, y, characteristics)
+                    "Лиса" -> {
+                        val foxSymbol = "🦊"
+                        Predator.Fox(x, y, foxSymbol, characteristics)
+                    }
+                    "Медведь" -> Predator.Bear(x, y, characteristics)
+                    "Орел" -> Predator.Eagle(x, y, characteristics)
+                    "Лошадь" -> Herbivore.Horse(x, y, characteristics)
+                    "Олень" -> Herbivore.Deer(x, y, characteristics)
+                    "Кролик" -> Herbivore.Rabbit(x, y, characteristics)
+                    "Мышь" -> Herbivore.Mouse(x, y, characteristics)
+                    "Коза" -> Herbivore.Goat(x, y, characteristics)
+                    "Овца" -> Herbivore.Sheep(x, y, characteristics)
+                    "Кабан" -> Herbivore.Boar(x, y, characteristics)
+                    "Буйвол" -> Herbivore.Buffalo(x, y, characteristics)
+                    "Утка" -> Herbivore.Duck(x, y, characteristics)
+                    "Гусеница" -> Herbivore.Caterpillar(x, y, characteristics)
+                    else -> error("Неизвестный тип животного: $animalName")
+                }
+                addAnimal(animal)
+            }
         }
 
         // Добавляем растения
         for (i in 0 until width) {
             for (j in 0 until height) {
-                if (Random.nextInt(100) < config.plantGrowthProbability) {
+                if (ThreadLocalRandom.current().nextInt(100) < config.plantGrowthProbability) {
                     grid[i][j].plants.add(Plant(i, j, "🌿"))
                 }
             }
         }
     }
 
-    // Добавление животного на остров
+    // Добавляем животное на остров
     fun addAnimal(animal: Animal) {
         if (animal.isWithinBounds(grid)) {
             grid[animal.x][animal.y].animals.add(animal)
         }
     }
 
-    // Обновление состояния острова
-    fun update() {
+    // Обновляем состояние острова
+    fun update(eatProbabilities: Map<String, Map<String, Int>>) {
         val newAnimals = mutableListOf<Animal>()
 
         for (i in 0 until width) {
@@ -125,8 +405,18 @@ class Island(val width: Int, val height: Int) {
                 val location = grid[i][j]
                 val animalsToRemove = mutableListOf<Animal>()
 
+                //Едим
                 for (animal in location.animals) {
-                    animal.move()
+                    animal.eat(location, eatProbabilities)
+                }
+
+                //Двигаемся
+                for (animal in location.animals) {
+                    animal.move(this)
+                }
+
+                //Размножаемся и умираем
+                for (animal in location.animals) {
                     if (!animal.isWithinBounds(grid)) {
                         animalsToRemove.add(animal)
                     } else {
@@ -147,18 +437,35 @@ class Island(val width: Int, val height: Int) {
         newAnimals.forEach { addAnimal(it) }
     }
 
-    // Получение состояния острова для визуализации
+    // Получаем состояние острова для визуализации
     fun getGridState(): Array<Array<String>> {
         return Array(width) { i ->
             Array(height) { j ->
                 when {
-                    grid[i][j].animals.any { it is Predator } -> "🐺" // Хищник
-                    grid[i][j].animals.any { it is Herbivore } -> "🦌" // Травоядное
+                    grid[i][j].animals.any { it is Predator } -> grid[i][j].animals.first { it is Predator }.symbol // Хищник
+                    grid[i][j].animals.any { it is Herbivore } -> grid[i][j].animals.first { it is Herbivore }.symbol // Травоядное
                     grid[i][j].plants.isNotEmpty() -> "🌿" // Растение
                     else -> "⬜" // Пустая клетка
                 }
             }
         }
+    }
+
+    // Статистика по острову
+    fun getStatistics(): String {
+        var herbivoresCount = 0
+        var predatorsCount = 0
+        var plantsCount = 0
+
+        for (i in 0 until width) {
+            for (j in 0 until height) {
+                herbivoresCount += grid[i][j].animals.count { it is Herbivore }
+                predatorsCount += grid[i][j].animals.count { it is Predator }
+                plantsCount += grid[i][j].plants.size
+            }
+        }
+
+        return "Травоядные: $herbivoresCount, Хищники: $predatorsCount, Растения: $plantsCount"
     }
 }
 
@@ -180,39 +487,50 @@ fun readSimulationConfig(): SimulationConfig {
     val width = readLine()?.toIntOrNull() ?: 20
     print("Высота острова: ")
     val height = readLine()?.toIntOrNull() ?: 20
-    print("Количество травоядных: ")
-    val herbivores = readLine()?.toIntOrNull() ?: 10
-    print("Количество хищников: ")
-    val predators = readLine()?.toIntOrNull() ?: 5
+
+    // Ввод количества животных каждого вида
+    val initialAnimals = mutableMapOf<String, Int>()
+    println("Введите начальное количество животных каждого вида (или 0, если не хотите добавлять):")
+    val animals = listOf("Волк", "Удав", "Лиса", "Медведь", "Орел", "Лошадь", "Олень", "Кролик", "Мышь", "Коза", "Овца", "Кабан", "Буйвол", "Утка", "Гусеница")
+    for (animal in animals) {
+        print("Количество $animal: ")
+        val count = readLine()?.toIntOrNull() ?: 0
+        initialAnimals[animal] = count
+    }
+
     print("Вероятность появления растений (%): ")
     val plantGrowth = readLine()?.toIntOrNull() ?: 20
     print("Длительность такта симуляции (секунд): ")
-    val speed = readLine()?.toLongOrNull() ?: 1L
+    val speed = readLine()?.toLongOrNull() ?: 7
+    print("Путь к файлу с данными (CSV): ")
+    val animalDataFile = readLine() ?: "C:\\Users\\NATA\\Downloads\\Таблицы-к-Острову.csv"
 
     return SimulationConfig(
         islandWidth = width,
         islandHeight = height,
-        initialHerbivores = herbivores,
-        initialPredators = predators,
+        initialAnimals = initialAnimals.toMap(),
         plantGrowthProbability = plantGrowth,
         simulationSpeed = speed * 1000, // Преобразование секунд в миллисекунды
         stopCondition = {
             false // Условие остановки можно изменить
-        }
+        },
+        animalDataFile = animalDataFile
     )
 }
-
 
 // Основная функция
 fun main() {
     val config = readSimulationConfig()
+    val (eatProbabilities, animalCharacteristics) = loadDataFromFile(config.animalDataFile)
+
     val island = Island(config.islandWidth, config.islandHeight)
-    island.initialize(config)
+    island.initialize(config, animalCharacteristics)
 
     // Запуск симуляции
     while (true) {
-        island.update()
+        island.update(eatProbabilities)
         printIsland(island.getGridState())
+        println(island.getStatistics()) // Вывод статистики
         Thread.sleep(config.simulationSpeed)
 
         // Условие остановки (например, если все животные вымерли)
