@@ -11,43 +11,48 @@ fun loadDataFromFile(filePath: String): Pair<Map<String, Map<String, Int>>, Map<
 
     try {
         val file = FileInputStream(filePath).bufferedReader()
-        file.readLine() // Пропускаем строку заголовков
+        val lines = file.readLines()
 
-        var line: String? = file.readLine()
-        while (line != null) {
-            if (line.trim().isEmpty()) {
-                line = file.readLine()
-                continue // Пропускаем пустые строки
+        // Проверяем, что есть как минимум две строки (заголовок и данные)
+        if (lines.size < 2) {
+            println("Файл CSV должен содержать как минимум 2 строки (заголовок и данные).")
+            file.close()
+            return Pair(eatProbabilities.toMap(), animalCharacteristics.toMap())
+        }
+
+        val header = lines[0].split(",").map { it.trim().replace("\"", "") }
+        val animalNames = header.subList(1, header.size).toMutableList()
+
+        // Заполнение вероятностей поедания
+        for (i in 1 until lines.size) {
+            val parts = lines[i].split(",").map { it.trim().replace("\"", "") }
+            if (parts.size != header.size) {
+                println("Некорректное количество столбцов в строке ${i + 1}. Ожидалось ${header.size}, получено ${parts.size}.")
+                continue
             }
 
-            val parts = line.split(",")
-            val animalName = parts.getOrNull(0)?.trim() ?: ""
+            val eater = parts[0]
 
-            //Если AnimalCharacteristic
-            if(animalName in listOf("Волк", "Удав", "Лиса", "Медведь", "Орел", "Лошадь", "Олень", "Кролик", "Мышь", "Коза", "Овца", "Кабан", "Буйвол", "Утка", "Гусеница")) {
-                val eatProbabilityMap = mutableMapOf<String, Int>()
-                eatProbabilityMap["Волк"] = parts.getOrNull(1)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Удав"] = parts.getOrNull(2)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Лиса"] = parts.getOrNull(3)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Медведь"] = parts.getOrNull(4)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Орел"] = parts.getOrNull(5)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Лошадь"] = parts.getOrNull(6)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Олень"] = parts.getOrNull(7)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Кролик"] = parts.getOrNull(8)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Мышь"] = parts.getOrNull(9)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Коза"] = parts.getOrNull(10)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Овца"] = parts.getOrNull(11)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Кабан"] = parts.getOrNull(12)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Буйвол"] = parts.getOrNull(13)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Утка"] = parts.getOrNull(14)?.replace("\"", "")?.toIntOrNull() ?: 0
-                eatProbabilityMap["Гусеница"] = parts.getOrNull(15)?.replace("\"", "")?.toIntOrNull() ?: 0
-
-                eatProbabilities[animalName] = eatProbabilityMap
-
-            } else {
-                println("Неизвестный тип записи: $animalName")
+            if (animalNames.contains(eater)) {
+                val preyProbabilities = mutableMapOf<String, Int>()
+                for (j in 1 until parts.size) {
+                    val prey = header[j]
+                    val probability = parts[j].toIntOrNull() ?: 0
+                    preyProbabilities[prey] = probability
+                }
+                eatProbabilities[eater] = preyProbabilities
             }
-            line = file.readLine()
+            else{
+                println("Некорректное имя животного в строке ${i+1}: $eater")
+            }
+        }
+
+        // Устанавливаем характеристики животных (можно раскомментировать, если нужна загрузка характеристик из файла)
+        val animalChar = AnimalCharacteristics(50.0, 20, 3.0, 10.0)
+        val animals = listOf("Волк", "Удав", "Лиса", "Медведь", "Орел", "Лошадь", "Олень", "Кролик", "Мышь", "Коза", "Овца", "Кабан", "Буйвол", "Утка", "Гусеница")
+
+        for (animal in animals) {
+            animalCharacteristics[animal] = animalChar
         }
 
         file.close()
@@ -55,24 +60,6 @@ fun loadDataFromFile(filePath: String): Pair<Map<String, Map<String, Int>>, Map<
     } catch (e: IOException) {
         println("Ошибка при чтении файла: ${e.message}")
     }
-
-    //Animal characteristic
-    val animalChar = AnimalCharacteristics(50.0,20,3.0,10.0)
-    animalCharacteristics["Волк"] = animalChar
-    animalCharacteristics["Удав"] = animalChar
-    animalCharacteristics["Лиса"] = animalChar
-    animalCharacteristics["Медведь"] = animalChar
-    animalCharacteristics["Орел"] = animalChar
-    animalCharacteristics["Лошадь"] = animalChar
-    animalCharacteristics["Олень"] = animalChar
-    animalCharacteristics["Кролик"] = animalChar
-    animalCharacteristics["Мышь"] = animalChar
-    animalCharacteristics["Коза"] = animalChar
-    animalCharacteristics["Овца"] = animalChar
-    animalCharacteristics["Кабан"] = animalChar
-    animalCharacteristics["Буйвол"] = animalChar
-    animalCharacteristics["Утка"] = animalChar
-    animalCharacteristics["Гусеница"] = animalChar
 
     return Pair(eatProbabilities.toMap(), animalCharacteristics.toMap())
 }
